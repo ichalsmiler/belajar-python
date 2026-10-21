@@ -238,11 +238,11 @@
     PYTHON
   </div>
   <div class="tabs" id="tabs">
-    <button data-mode="materi">📘 Materi Visual</button>
     <button data-mode="editor">💻 Editor Kode</button>
+    <button data-mode="materi">📘 Materi</button>
     <button data-mode="latihan">🏆 Latihan</button>
   </div>
-  <span class="version" id="appVersion" title="Versi aplikasi (naik otomatis setiap commit)">V1.1</span>
+  <span class="version" id="appVersion" title="Versi aplikasi (naik otomatis setiap commit)">V1.2</span>
 </header>
 
 <div class="layout">
@@ -250,7 +250,7 @@
 
   <main>
     <!-- ================= MATERI ================= -->
-    <section id="viewLesson">
+    <section id="viewLesson" hidden>
       <div class="title">
         <div class="py" id="lessonNo"></div>
         <h1 id="lessonTitle"></h1>
@@ -308,7 +308,7 @@
     </section>
 
     <!-- ================= EDITOR / LATIHAN ================= -->
-    <section id="viewEditor" hidden>
+    <section id="viewEditor">
       <div class="title">
         <div class="py" id="edKicker"></div>
         <h1 id="edTitle"></h1>
@@ -825,7 +825,7 @@ function Player(p, onLine) {
 }
 
 // ---------- State ----------
-let mode = 'materi', lesson, editorCtx = null;
+let mode = 'editor', lesson, editorCtx = null;
 const solvedQuiz = new Set(store.get('quiz', []));
 const solvedTask = new Set(store.get('tasks', []));
 
@@ -1366,7 +1366,7 @@ document.addEventListener('keydown', e => {
   else if (e.key.toLowerCase() === 'r') P.reset();
 });
 
-setMode('materi');
+setMode('editor');
 </script>
 </body>
 </html>
