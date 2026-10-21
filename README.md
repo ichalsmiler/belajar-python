@@ -45,6 +45,14 @@ curl -fsSL https://raw.githubusercontent.com/ichalsmiler/belajar-python/main/ins
 
 Skrip memasang nginx dan git, menyalin aplikasi ke `/var/www/belajar-python`, lalu membuat konfigurasi nginx. Jalankan perintah yang sama lagi untuk update.
 
+## Versi
+
+Versi aplikasi tampil di pojok kanan atas dan tersimpan di file `VERSION`. Hook `.githooks/pre-commit` menaikkannya otomatis setiap commit (V1.1 → V1.2 → … → V1.10, dst.). Aktifkan sekali setelah clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## Jalankan lokal
 
 Cukup buka `index.html` di browser. Tidak perlu server atau instalasi.
