@@ -405,7 +405,7 @@ const LESSONS = [
       T.prompt('Enter text: ');
       T.snap(1, 'Fungsi <b>input()</b> menampilkan teks "Enter text: " dan menunggu pengguna mengetik.');
       T.typed(inp); T.set('text', 'str', inp);
-      T.snap(1, `Pengguna mengetik <b>${inp}</b> lalu menekan Enter. Nilainya disimpan ke variabel <b>text</b>.`);
+      T.snap(1, `Pengguna mengetik <b>${esc(inp)}</b> lalu menekan Enter. Nilainya disimpan ke variabel <b>text</b>.`);
       T.set('vowels', 'str', 'aeiou');
       T.snap(3, 'Variabel <b>vowels</b> berisi semua huruf vokal sebagai acuan.');
       let count = 0;
@@ -418,10 +418,10 @@ const LESSONS = [
           count++;
           T.mark('vowels', { hl: [{ i: k, st: 'hit' }], mark: 'hit' });
           T.set('count', 'num', count);
-          T.snap(4, `char = "${c}" → "${lc}" <b>ada</b> di vowels ✔ → True (1). count menjadi <b>${count}</b>.`);
+          T.snap(4, `char = "${esc(c)}" → "${esc(lc)}" <b>ada</b> di vowels ✔ → True (1). count menjadi <b>${count}</b>.`);
         } else {
           T.mark('vowels', { mark: 'miss' });
-          T.snap(4, `char = "${c}" → "${lc}" <b>tidak ada</b> di vowels ✘ → False (0). count tetap <b>${count}</b>.`);
+          T.snap(4, `char = "${esc(c)}" → "${esc(lc)}" <b>tidak ada</b> di vowels ✘ → False (0). count tetap <b>${count}</b>.`);
         }
       });
       T.print(`Vowels: ${count}`);
@@ -445,21 +445,21 @@ const LESSONS = [
       T.prompt('Enter text: ');
       T.snap(1, 'Program menunggu input dari pengguna.');
       T.typed(inp); T.set('text', 'str', inp);
-      T.snap(1, `Input <b>${inp}</b> disimpan ke <b>text</b>.`);
+      T.snap(1, `Input <b>${esc(inp)}</b> disimpan ke <b>text</b>.`);
       let result = '';
       T.set('result', 'str', '');
       T.snap(2, '<b>result</b> dimulai sebagai string kosong.');
       [...inp].forEach((c, i) => {
         T.mark('text', { ptrs: [{ i, name: 'char', val: c }] });
-        T.snap(3, `Perulangan mengambil huruf ke-${i}: char = "${c}".`);
+        T.snap(3, `Perulangan mengambil huruf ke-${i}: char = "${esc(c)}".`);
         result = c + result;
         T.mark('text', { ptrs: [{ i, name: 'char', val: c }] });
         T.set('result', 'str', result);
         T.mark('result', { hl: [{ i: 0, st: 'hit' }] });
-        T.snap(4, `"${c}" ditaruh di depan → result = ${pyStr(result)}.`);
+        T.snap(4, `"${esc(c)}" ditaruh di depan → result = ${esc(pyStr(result))}.`);
       });
       T.print(`Reversed: ${result}`);
-      T.snap(5, `Hasil akhirnya <b>${result}</b>.`);
+      T.snap(5, `Hasil akhirnya <b>${esc(result)}</b>.`);
     },
   },
   {
@@ -486,7 +486,7 @@ const LESSONS = [
       T.snap(1, 'Program meminta sebuah kata.');
       const w = inp.toLowerCase();
       T.typed(inp); T.set('word', 'str', w);
-      T.snap(1, `Input <b>${inp}</b> diubah ke huruf kecil dengan <b>.lower()</b> → ${pyStr(w)}.`);
+      T.snap(1, `Input <b>${esc(inp)}</b> diubah ke huruf kecil dengan <b>.lower()</b> → ${esc(pyStr(w))}.`);
       let left = 0, right = w.length - 1, isPal = true;
       const ptrs = () => T.mark('word', { ptrs: [{ i: left, name: 'left', val: left }, { i: right, name: 'right', val: right, alt: true }] });
       T.set('left', 'num', left); ptrs();
@@ -501,7 +501,7 @@ const LESSONS = [
         T.snap(5, `${left} &lt; ${right} bernilai True → masuk ke perulangan.`);
         const same = w[left] === w[right];
         ptrs(); T.mark('word', { hl: [{ i: left, st: same ? 'hit' : 'miss' }, { i: right, st: same ? 'hit' : 'miss' }] });
-        T.snap(6, `Bandingkan word[${left}] = "${w[left]}" dengan word[${right}] = "${w[right]}" → ${same ? '<b>sama</b> ✔' : '<b>berbeda</b> ✘'}.`);
+        T.snap(6, `Bandingkan word[${left}] = "${esc(w[left])}" dengan word[${right}] = "${esc(w[right])}" → ${same ? '<b>sama</b> ✔' : '<b>berbeda</b> ✘'}.`);
         if (!same) {
           isPal = false; T.set('is_pal', 'bool', false); ptrs();
           T.snap(7, 'Karena berbeda, is_pal diubah menjadi False.');
@@ -514,7 +514,7 @@ const LESSONS = [
         T.snap(10, `right bergeser ke kiri → ${right}.`);
       }
       T.print(`Palindrome: ${isPal ? 'True' : 'False'}`);
-      T.snap(11, isPal ? `"${w}" dibaca sama dari depan maupun belakang → <b>True</b>.` : `"${w}" bukan palindrom → <b>False</b>.`);
+      T.snap(11, isPal ? `"${esc(w)}" dibaca sama dari depan maupun belakang → <b>True</b>.` : `"${esc(w)}" bukan palindrom → <b>False</b>.`);
     },
   },
   {
@@ -1011,11 +1011,35 @@ $('bResetCode').onclick = () => {
 
 // ---------- Python (Pyodide) ----------
 const PY_HARNESS = String.raw`
-import sys, json, types, builtins, traceback
+import sys, ast, json, types, builtins, traceback
 from js import prompt as _js_prompt
 
 class _Stop(BaseException):
     pass
+
+_TICK = '__bpv_tick__'
+
+class _GuardInjector(ast.NodeTransformer):
+    # Menyisipkan __bpv_tick__() di awal setiap badan perulangan dan blok except.
+    # Begitu program dihentikan, tick terus melempar _Stop, sehingga "except:" milik
+    # pengguna tidak bisa menelannya (melempar dari fungsi trace mematikan tracing).
+    def _guard(self, body):
+        call = ast.Expr(ast.Call(ast.Name(_TICK, ast.Load()), [], []))
+        ast.copy_location(call, body[0])
+        ast.fix_missing_locations(call)
+        return [call] + body
+
+    def visit_While(self, node):
+        self.generic_visit(node)
+        node.body = self._guard(node.body)
+        return node
+
+    visit_For = visit_AsyncFor = visit_While
+
+    def visit_ExceptHandler(self, node):
+        self.generic_visit(node)
+        node.body = self._guard(node.body)
+        return node
 
 class _Out:
     def __init__(self, segs, kind):
@@ -1069,10 +1093,18 @@ def _groups(frame):
 def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
     segs, steps = [], []
     lines_in = stdin.split('\n') if stdin else []
-    state = {'count': 0, 'truncated': False}
+    state = {'count': 0, 'truncated': False, 'stopped': None}
     pending = {}
     ns = {'__name__': '__main__'}
     b = dict(builtins.__dict__)
+
+    def stop(msg):
+        state['stopped'] = msg
+        raise _Stop(msg)
+
+    def _tick():
+        if state['stopped']:
+            raise _Stop(state['stopped'])
 
     def _input(p=''):
         p = str(p)
@@ -1083,7 +1115,7 @@ def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
         elif interactive:
             r = _js_prompt(p or 'Masukkan input:')
             if r is None:
-                raise _Stop('Input dibatalkan.')
+                stop('Input dibatalkan.')
             v = str(r)
         else:
             raise EOFError('input() dipanggil lebih banyak dari data input yang tersedia')
@@ -1091,6 +1123,7 @@ def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
         return v
 
     b['input'] = _input
+    b[_TICK] = _tick
     ns['__builtins__'] = b
 
     def emit(line, frame):
@@ -1105,12 +1138,15 @@ def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
         if event == 'line':
             state['count'] += 1
             if state['count'] > max_lines:
-                raise _Stop('Program dihentikan: terlalu banyak langkah (kemungkinan perulangan tanpa akhir).')
+                stop('Program dihentikan: terlalu banyak langkah (kemungkinan perulangan tanpa akhir).')
             if trace:
                 k = id(frame)
                 if k in pending:
                     emit(pending[k], frame)
                 pending[k] = frame.f_lineno
+        elif event == 'exception' and trace:
+            # Baris yang melempar error tidak selesai, jadi tidak dicatat sebagai langkah normal.
+            pending.pop(id(frame), None)
         elif event == 'return' and trace:
             k = id(frame)
             if k in pending:
@@ -1121,7 +1157,8 @@ def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
     old = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = _Out(segs, 'o'), _Out(segs, 'e')
     try:
-        code = compile(src, '<user>', 'exec')
+        tree = _GuardInjector().visit(ast.parse(src, '<user>'))
+        code = compile(tree, '<user>', 'exec')
         sys.settrace(tr)
         try:
             exec(code, ns)
@@ -1136,6 +1173,8 @@ def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
         err = {'type': type(e).__name__, 'msg': str(e), 'line': tb[-1].lineno if tb else None}
     finally:
         sys.stdout, sys.stderr = old
+    if state['stopped'] and (err is None or err['type'] != 'Stop'):
+        err = {'type': 'Stop', 'msg': state['stopped'], 'line': None}
     if err:
         text = err['msg'] if err['type'] == 'Stop' else err['type'] + (': ' + err['msg'] if err['msg'] else '')
         if err['line']:
@@ -1219,11 +1258,16 @@ function traceSteps(res, src) {
     return { line: s.line, vars, segs: s.segs, note };
   });
   const last = steps[steps.length - 1];
-  if (res.err) {
+  if (res.truncated) {
+    // Langkah ke-400 bukan akhir program, jadi keadaan akhir ditampilkan sebagai langkah tersendiri.
+    steps.push({ line: res.err ? res.err.line : 0, err: !!res.err, vars: toVars(res.final, null).vars, segs: res.segs,
+      note: (res.err ? errNote(res.err) : '<b>✔ Program selesai.</b>') +
+        '<br>Visualisasi hanya merekam 400 langkah pertama. Program tetap berjalan sampai akhir; yang tampil di sini adalah output dan variabel global terakhir.' });
+  } else if (res.err) {
     steps.push({ line: res.err.line, err: true, vars: last ? last.vars.map(v => ({ ...v, changed: false })) : [], segs: res.segs, note: errNote(res.err) });
   } else if (last) {
     last.segs = res.segs;
-    last.note += '<br><b>✔ Program selesai.</b>' + (res.truncated ? ' (Visualisasi dibatasi 400 langkah pertama.)' : '');
+    last.note += '<br><b>✔ Program selesai.</b>';
   } else {
     steps.push({ line: 0, vars: [], segs: res.segs, note: 'Tidak ada baris yang dijalankan.' });
   }

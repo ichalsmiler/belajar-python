@@ -37,6 +37,12 @@ Dengan port atau domain tertentu:
 curl -fsSL https://raw.githubusercontent.com/ichalsmiler/belajar-python/main/install.sh | sudo PORT=8080 DOMAIN=contoh.id bash
 ```
 
+Site `default` bawaan nginx tidak dihapus otomatis. Jika server dibuka lewat IP di port 80 masih menampilkan halaman bawaan nginx, jalankan dengan `REPLACE_DEFAULT=1` untuk menonaktifkannya (atau gunakan `PORT`/`DOMAIN`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ichalsmiler/belajar-python/main/install.sh | sudo REPLACE_DEFAULT=1 bash
+```
+
 Skrip memasang nginx dan git, menyalin aplikasi ke `/var/www/belajar-python`, lalu membuat konfigurasi nginx. Jalankan perintah yang sama lagi untuk update.
 
 ## Jalankan lokal
