@@ -12,6 +12,19 @@ Materi:
 
 Setiap materi punya penjelasan per langkah, input yang bisa diganti, kartu konsep, dan tantangan tebak output. Kontrol keyboard: Spasi (putar/jeda), ← → (mundur/maju), R (ulang).
 
+### Editor Kode
+- Tulis kode Python sendiri dan jalankan langsung di browser (Python asli lewat [Pyodide](https://pyodide.org)).
+- **▶ Jalankan** (Ctrl + Enter): menampilkan output dan nilai akhir variabel.
+- **🔍 Langkah demi Langkah** (Ctrl + Shift + Enter): visualisasi baris aktif, kotak variabel, variabel lokal fungsi, dan output per langkah.
+- Kolom input untuk `input()`; jika kosong, browser menanyakan input saat program berjalan.
+- Pesan error dijelaskan dalam bahasa Indonesia, dan perulangan tanpa akhir dihentikan otomatis.
+- 12 contoh kode (variabel, if, for, while, list, fungsi, dictionary, contoh error, dll.). Kode tersimpan otomatis di browser.
+
+### Latihan
+8 soal dengan penilaian otomatis (dicek dengan beberapa input), lengkap dengan petunjuk dan contoh solusi. Progres tersimpan di browser.
+
+> Editor dan Latihan memerlukan koneksi internet di sisi pengguna untuk memuat Python (±10 MB, hanya pertama kali).
+
 ## Install di Ubuntu Server
 
 ```bash

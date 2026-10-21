@@ -6,6 +6,7 @@
 <title>Belajar Python Visual</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <style>
   :root {
     --bg: #05070a;
@@ -33,15 +34,22 @@
     margin: 0; background: var(--bg); color: var(--text);
     font-family: var(--mono); font-size: 14px; line-height: 1.5; font-variant-ligatures: none;
   }
-  button, input, select { font: inherit; }
+  button, input, select, textarea { font: inherit; }
+  code { color: var(--str); }
+  [hidden] { display: none !important; }
 
   header {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    padding: 14px 20px; border-bottom: 1px solid #12232e;
+    display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap;
+    padding: 12px 20px; border-bottom: 1px solid #12232e;
   }
   .logo { display: flex; align-items: center; gap: 8px; font-weight: 800; color: var(--yellow); font-size: 18px; }
   .logo svg { width: 26px; height: 26px; }
-  header .tag { color: var(--muted); font-size: 12px; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tabs button {
+    background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 999px;
+    padding: 5px 14px; cursor: pointer;
+  }
+  .tabs button.active { background: var(--yellow); border-color: var(--yellow); color: #1a1600; font-weight: 800; }
 
   .layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 60px); }
   nav { border-right: 1px solid #12232e; padding: 16px 12px; }
@@ -62,6 +70,7 @@
   .title h1 { margin: 2px 0 0; font-size: 20px; color: var(--yellow); letter-spacing: .04em; }
 
   .grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: start; }
+  .grid.ed { grid-template-columns: 1.15fr 1fr; }
   .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
   /* Stage: kotak variabel */
@@ -69,15 +78,18 @@
     min-height: 170px; display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start;
     gap: 14px 16px; padding: 10px 6px 0;
   }
+  .empty-stage { color: var(--muted); align-self: center; text-align: center; padding-top: 50px; }
+  .grp { flex-basis: 100%; text-align: center; color: var(--kw); font-size: 12px; border-top: 1px dashed var(--border); padding-top: 6px; }
   .var { display: flex; flex-direction: column; align-items: center; animation: pop .25s ease; }
   .var .name { color: var(--cyan); font-size: 12px; margin-bottom: 4px; }
-  .cells { position: relative; display: flex; border: 2px solid var(--cyan); border-radius: 6px; padding-bottom: 0; }
+  .cells { position: relative; display: flex; border: 2px solid var(--cyan); border-radius: 6px; }
   .cell {
     width: var(--cw, 26px); height: 34px; display: grid; place-items: center;
-    font-weight: 800; font-size: 16px; color: #fff; letter-spacing: 0; transition: background .2s;
+    font-weight: 800; font-size: 16px; color: #fff; transition: background .2s; white-space: pre;
   }
   .cells.str .cell { --cw: 26px; }
   .cells.list .cell { --cw: 42px; border-right: 1px solid #1f4a5c; }
+  .cells.list.auto .cell { width: auto; min-width: 42px; padding: 0 7px; font-size: 14px; }
   .cells.list .cell:last-child { border-right: none; }
   .cells.empty { min-width: 46px; height: 38px; display: grid; place-items: center; color: var(--muted); }
   .cell.hit { background: var(--green); color: #04130a; }
@@ -86,9 +98,12 @@
   .cells.mark-miss .cell { color: #fca5a5; }
   .cells.mark-hit { background: var(--green-soft); border-color: var(--green); }
   .box {
-    min-width: 46px; height: 38px; padding: 0 12px; display: grid; place-items: center;
-    border: 2px solid var(--cyan); border-radius: 6px; font-weight: 800; font-size: 16px; color: #fff;
+    min-width: 46px; height: 38px; padding: 0 12px; display: grid; place-items: center; max-width: 100%;
+    border: 2px solid var(--cyan); border-radius: 6px; font-weight: 800; font-size: 16px; color: #fff; white-space: pre;
+    overflow: hidden; text-overflow: ellipsis;
   }
+  .box.small { font-size: 13px; font-weight: 600; }
+  .box.fn { border-color: var(--kw); color: var(--kw); font-size: 13px; }
   .box.bool-true { border-color: var(--green); color: var(--green); }
   .box.bool-false { border-color: var(--red); color: #fca5a5; }
   .changed .box, .changed .cells { animation: flash .6s ease; }
@@ -115,9 +130,10 @@
   }
   .output {
     background: var(--panel); border: 1px solid var(--border); border-radius: 0 6px 6px 6px;
-    min-height: 92px; padding: 10px 14px; white-space: pre-wrap;
+    min-height: 92px; max-height: 320px; overflow: auto; padding: 10px 14px; white-space: pre-wrap; word-break: break-word;
   }
   .output .in { color: var(--blue); }
+  .output .err { color: #f87171; }
   .output .enter {
     display: inline-block; margin-left: 10px; padding: 0 8px; border: 1px solid var(--green); border-radius: 4px;
     color: var(--green); font-size: 12px; line-height: 16px;
@@ -125,11 +141,12 @@
   .cursor { display: inline-block; width: 8px; height: 15px; background: var(--text); vertical-align: -2px; animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
 
-  /* Code */
+  /* Code (materi) */
   .editor { background: #0a2236; border: 1px solid #23506c; border-radius: 10px; overflow: hidden; }
-  .dots { display: flex; gap: 7px; padding: 12px 14px; }
+  .dots { display: flex; gap: 7px; padding: 12px 14px; align-items: center; }
   .dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
   .dots i:nth-child(1) { background: #ff5f57; } .dots i:nth-child(2) { background: #febc2e; } .dots i:nth-child(3) { background: #28c840; }
+  .dots .fname { margin-left: 8px; color: var(--muted); font-size: 12px; }
   .code { padding: 6px 0 14px; overflow-x: auto; }
   .ln { display: flex; padding: 1px 14px 1px 0; border-left: 3px solid transparent; white-space: pre; min-height: 22px; transition: background .2s; }
   .ln .no { width: 34px; text-align: right; padding-right: 12px; color: #5b7a8e; user-select: none; flex: none; }
@@ -137,6 +154,23 @@
   .ln.active .no { color: var(--yellow); }
   .tk-kw { color: var(--kw); } .tk-str { color: var(--str); } .tk-num { color: var(--num); }
   .tk-fn { color: var(--fn); } .tk-com { color: #5b7a8e; font-style: italic; }
+
+  /* Editor kode (CodeMirror) */
+  .CodeMirror { background: #0a2236; color: var(--text); height: 360px; font-family: var(--mono); font-size: 14px; line-height: 1.55; font-variant-ligatures: none; }
+  * { scrollbar-width: thin; scrollbar-color: #1f4a5c transparent; }
+  .CodeMirror-gutters { background: #0a2236; border-right: 1px solid #1f4a5c; }
+  .CodeMirror-linenumber { color: #5b7a8e; }
+  .CodeMirror-cursor { border-left: 2px solid var(--yellow); }
+  .CodeMirror-selected, .CodeMirror-focused .CodeMirror-selected { background: #24577a !important; }
+  .CodeMirror-matchingbracket { color: var(--yellow) !important; }
+  .cm-s-default .cm-keyword { color: var(--kw); } .cm-s-default .cm-string { color: var(--str); }
+  .cm-s-default .cm-number { color: var(--num); } .cm-s-default .cm-builtin { color: var(--fn); }
+  .cm-s-default .cm-comment { color: #5b7a8e; font-style: italic; } .cm-s-default .cm-def { color: var(--fn); }
+  .cm-s-default .cm-variable, .cm-s-default .cm-variable-2, .cm-s-default .cm-property { color: var(--text); }
+  .cm-s-default .cm-operator { color: var(--cyan); } .cm-s-default .cm-atom { color: var(--num); }
+  .cm-step { background: var(--line-hl); box-shadow: inset 3px 0 var(--yellow); }
+  .cm-err { background: rgba(185, 28, 28, .35); box-shadow: inset 3px 0 #f87171; }
+  textarea.plain-editor { width: 100%; height: 360px; background: #0a2236; color: var(--text); border: 0; padding: 10px 14px; font-family: var(--mono); resize: vertical; }
 
   /* Controls */
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -146,11 +180,15 @@
   }
   .btn:hover { border-color: var(--cyan); }
   .btn.primary { background: var(--yellow); color: #1a1600; border-color: var(--yellow); font-weight: 800; }
+  .btn.go { background: var(--green); color: #04130a; border-color: var(--green); font-weight: 800; }
   .btn:disabled { opacity: .4; cursor: default; }
   select.btn { padding: 7px 8px; }
   .progress { flex: 1 1 140px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
   .bar { flex: 1; height: 6px; background: #12232e; border-radius: 3px; overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--yellow); width: 0; transition: width .2s; }
+  .status { color: var(--muted); font-size: 12px; }
+  .status.ok { color: var(--green); }
+  .status.bad { color: #f87171; }
 
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
   .card h4 { margin: 0 0 6px; font-size: 12px; color: var(--yellow); letter-spacing: .06em; }
@@ -162,13 +200,21 @@
   .field {
     flex: 1 1 160px; background: #061018; color: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
   }
+  textarea.field { width: 100%; resize: vertical; }
   .field:focus { outline: none; border-color: var(--cyan); }
   .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
   .fb { margin-top: 8px; font-weight: 600; }
   .fb.ok { color: var(--green); } .fb.no { color: #f87171; }
 
+  .task { margin-bottom: 16px; border-color: #3b4d1e; }
+  .tests { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; font-size: 13px; }
+  .tests div { background: #061018; border-radius: 6px; padding: 4px 10px; color: var(--muted); }
+  .tests div b { color: var(--text); font-weight: 600; }
+  .tests div.pass { color: var(--green); } .tests div.fail { color: #f87171; }
+  .task-extra { margin-top: 8px; padding: 8px 10px; background: #061018; border-radius: 6px; white-space: pre-wrap; }
+
   @media (max-width: 1150px) {
-    .grid { grid-template-columns: 1fr; }
+    .grid, .grid.ed { grid-template-columns: 1fr; }
   }
   @media (max-width: 900px) {
     .layout { grid-template-columns: 1fr; }
@@ -177,7 +223,7 @@
     nav button { flex: none; width: auto; margin: 0; }
     nav button small { display: none; }
     main { padding: 16px; }
-    .grid { grid-template-columns: 1fr; }
+    .CodeMirror, textarea.plain-editor { height: 300px; }
   }
 </style>
 </head>
@@ -187,81 +233,135 @@
     <svg viewBox="0 0 32 32" aria-hidden="true"><path fill="#3776ab" d="M15.9 2c-7 0-6.6 3-6.6 3v3.2h6.7v1H6.6S2 8.6 2 15.7s4 6.8 4 6.8h2.4v-3.3s-.1-4 3.9-4h6.7s3.8.1 3.8-3.7V5.3S23.4 2 15.9 2zm-3.7 2.2a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z"/><path fill="#ffd43b" d="M16.1 30c7 0 6.6-3 6.6-3v-3.2H16v-1h9.4s4.6.5 4.6-6.6-4-6.8-4-6.8h-2.4v3.3s.1 4-3.9 4H13s-3.8-.1-3.8 3.7v6.3S8.6 30 16.1 30zm3.7-2.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z"/></svg>
     PYTHON
   </div>
-  <span class="tag">Belajar Python secara visual — lihat kode berjalan baris demi baris</span>
+  <div class="tabs" id="tabs">
+    <button data-mode="materi">📘 Materi Visual</button>
+    <button data-mode="editor">💻 Editor Kode</button>
+    <button data-mode="latihan">🏆 Latihan</button>
+  </div>
 </header>
 
 <div class="layout">
-  <nav id="nav"><h3>MATERI</h3></nav>
+  <nav id="nav"></nav>
 
   <main>
-    <div class="title">
-      <div class="py" id="lessonNo"></div>
-      <h1 id="lessonTitle"></h1>
-    </div>
-
-    <div class="grid">
-      <div class="col">
-        <div class="stage" id="stage"></div>
-        <div>
-          <span class="label">OUTPUT</span>
-          <div class="output" id="output"></div>
-        </div>
-        <div class="card note">
-          <h4>PENJELASAN</h4>
-          <div id="note"></div>
-        </div>
+    <!-- ================= MATERI ================= -->
+    <section id="viewLesson">
+      <div class="title">
+        <div class="py" id="lessonNo"></div>
+        <h1 id="lessonTitle"></h1>
       </div>
 
-      <div class="col">
-        <div class="editor">
-          <div class="dots"><i></i><i></i><i></i></div>
-          <div class="code" id="code"></div>
+      <div class="grid">
+        <div class="col">
+          <div class="stage" id="Lstage"></div>
+          <div>
+            <span class="label">OUTPUT</span>
+            <div class="output" id="Loutput"></div>
+          </div>
+          <div class="card note">
+            <h4>PENJELASAN</h4>
+            <div id="Lnote"></div>
+          </div>
         </div>
 
-        <div class="controls">
-          <button class="btn" id="bReset" title="Ulang (R)">⏮</button>
-          <button class="btn" id="bPrev" title="Mundur (←)">◀</button>
-          <button class="btn primary" id="bPlay" title="Putar / jeda (Spasi)">▶ Putar</button>
-          <button class="btn" id="bNext" title="Maju (→)">▶|</button>
-          <select class="btn" id="speed" title="Kecepatan">
-            <option value="1600">0.5×</option>
-            <option value="900" selected>1×</option>
-            <option value="450">2×</option>
-          </select>
-          <div class="progress"><div class="bar"><i id="barFill"></i></div><span id="stepInfo"></span></div>
-        </div>
+        <div class="col">
+          <div class="editor">
+            <div class="dots"><i></i><i></i><i></i></div>
+            <div class="code" id="code"></div>
+          </div>
+          <div id="Lctl"></div>
 
-        <div class="card">
-          <h4>COBA INPUT SENDIRI</h4>
+          <div class="card">
+            <h4>COBA INPUT SENDIRI</h4>
+            <div class="row">
+              <input class="field" id="userInput" autocomplete="off">
+              <button class="btn primary" id="bRun">Jalankan</button>
+            </div>
+            <div class="hint" id="inputHint"></div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn go" id="bToEditor">✎ Ubah &amp; jalankan kode ini di Editor</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>KONSEP</h4>
+            <div id="concept"></div>
+            <div class="chips" id="chips"></div>
+          </div>
+
+          <div class="card">
+            <h4>TANTANGAN — TEBAK OUTPUT</h4>
+            <div id="quizQ"></div>
+            <div class="row" style="margin-top:8px">
+              <input class="field" id="quizA" placeholder="Tulis output-nya…" autocomplete="off">
+              <button class="btn" id="bQuiz">Cek</button>
+            </div>
+            <div class="fb" id="quizFb"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= EDITOR / LATIHAN ================= -->
+    <section id="viewEditor" hidden>
+      <div class="title">
+        <div class="py" id="edKicker"></div>
+        <h1 id="edTitle"></h1>
+      </div>
+
+      <div class="card task" id="task" hidden>
+        <h4>SOAL</h4>
+        <div id="taskDesc"></div>
+        <div class="tests" id="taskTests"></div>
+        <div class="row">
+          <button class="btn go" id="bCheck">✔ Cek Jawaban</button>
+          <button class="btn" id="bHint">💡 Petunjuk</button>
+          <button class="btn" id="bSol">Lihat Solusi</button>
+        </div>
+        <div class="fb" id="taskFb"></div>
+        <div class="task-extra" id="taskExtra" hidden></div>
+      </div>
+
+      <div class="grid ed">
+        <div class="col">
+          <div class="editor">
+            <div class="dots"><i></i><i></i><i></i><span class="fname">main.py</span></div>
+            <div id="cm"></div>
+          </div>
           <div class="row">
-            <input class="field" id="userInput" autocomplete="off">
-            <button class="btn primary" id="bRun">Jalankan</button>
+            <button class="btn primary" id="bRunCode" title="Ctrl + Enter">▶ Jalankan</button>
+            <button class="btn" id="bTrace" title="Ctrl + Shift + Enter">🔍 Langkah demi Langkah</button>
+            <button class="btn" id="bResetCode" title="Kembalikan kode awal">⟲ Reset</button>
+            <span class="status" id="pyStatus"></span>
           </div>
-          <div class="hint" id="inputHint"></div>
+          <div class="card">
+            <h4>INPUT PROGRAM</h4>
+            <textarea class="field" id="stdin" rows="3" placeholder="Contoh:&#10;ORANGE"></textarea>
+            <div class="hint">Satu baris untuk setiap <code>input()</code>. Jika kosong, browser akan menanyakan input saat program berjalan.</div>
+          </div>
         </div>
 
-        <div class="card">
-          <h4>KONSEP</h4>
-          <div id="concept"></div>
-          <div class="chips" id="chips"></div>
-        </div>
-
-        <div class="card">
-          <h4>TANTANGAN — TEBAK OUTPUT</h4>
-          <div id="quizQ"></div>
-          <div class="row" style="margin-top:8px">
-            <input class="field" id="quizA" placeholder="Tulis output-nya…" autocomplete="off">
-            <button class="btn" id="bQuiz">Cek</button>
+        <div class="col">
+          <div class="stage" id="Estage"></div>
+          <div>
+            <span class="label">OUTPUT</span>
+            <div class="output" id="Eoutput"></div>
           </div>
-          <div class="fb" id="quizFb"></div>
+          <div class="card note">
+            <h4>PENJELASAN</h4>
+            <div id="Enote"></div>
+          </div>
+          <div id="Ectl"></div>
         </div>
       </div>
-    </div>
+    </section>
   </main>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
 <script>
-// ---------- Tracer: merekam snapshot keadaan program per langkah ----------
+// ---------- Tracer: merekam snapshot keadaan program per langkah (materi) ----------
 function Tracer() {
   const vars = [], out = [], steps = [];
   const find = name => vars.find(v => v.name === name);
@@ -537,22 +637,87 @@ const LESSONS = [
   },
 ];
 
-// ---------- Tampilan ----------
+// ---------- Contoh kode untuk Editor ----------
+const EXAMPLES = [
+  { name: 'Kode Kosong', sub: 'mulai dari nol', code: '# Tulis kode Python di sini\n' },
+  { name: 'Halo Dunia', sub: 'print()', code: 'print("Halo, dunia!")\nprint("Selamat belajar Python")\n' },
+  { name: 'Variabel & Tipe Data', sub: 'str, int, float, bool', code: 'nama = "Budi"\numur = 16\ntinggi = 165.5\npelajar = True\n\nprint(nama, "berumur", umur, "tahun")\nprint(type(tinggi))\nprint("Pelajar?", pelajar)\n' },
+  { name: 'Input & Operasi Angka', sub: 'input(), int()', stdin: '7\n5', code: 'a = int(input("Angka pertama: "))\nb = int(input("Angka kedua: "))\n\nprint("Jumlah :", a + b)\nprint("Kali   :", a * b)\nprint("Bagi   :", a / b)\nprint("Sisa   :", a % b)\n' },
+  { name: 'If – Elif – Else', sub: 'percabangan', stdin: '82', code: 'nilai = int(input("Nilai ujian: "))\n\nif nilai >= 90:\n    grade = "A"\nelif nilai >= 75:\n    grade = "B"\nelif nilai >= 60:\n    grade = "C"\nelse:\n    grade = "D"\n\nprint("Grade:", grade)\n' },
+  { name: 'Perulangan for', sub: 'range()', code: 'total = 0\nfor i in range(1, 6):\n    total += i\n    print("i =", i, "total =", total)\n' },
+  { name: 'Perulangan while', sub: 'kondisi berulang', code: 'n = 10\nlangkah = 0\nwhile n != 1:\n    if n % 2 == 0:\n        n = n // 2\n    else:\n        n = 3 * n + 1\n    langkah += 1\nprint("Selesai dalam", langkah, "langkah")\n' },
+  { name: 'List', sub: 'append, insert, len', code: 'buah = ["apel", "jeruk"]\nbuah.append("mangga")\nbuah.insert(0, "anggur")\nprint(buah)\nprint("Jumlah buah:", len(buah))\nfor b in buah:\n    print("-", b.upper())\n' },
+  { name: 'Fungsi', sub: 'def & return', code: 'def luas_lingkaran(r):\n    pi = 3.14\n    hasil = pi * r * r\n    return hasil\n\nfor jari in [1, 2, 3]:\n    print(jari, "->", luas_lingkaran(jari))\n' },
+  { name: 'Dictionary', sub: 'kunci & nilai', code: 'siswa = {"nama": "Ani", "kelas": "X-1", "nilai": 88}\nsiswa["nilai"] += 5\nfor kunci, isi in siswa.items():\n    print(kunci, ":", isi)\n' },
+  { name: 'Hitung Vokal (video)', sub: 'sum() + generator', stdin: 'ORANGE', code: LESSONS[0].code.join('\n') + '\n' },
+  { name: 'Contoh Error', sub: 'belajar membaca error', stdin: '5', code: 'angka = input("Masukkan angka: ")\nhasil = angka + 10\nprint(hasil)\n' },
+];
+
+// ---------- Latihan dengan penilaian otomatis ----------
+const TASKS = [
+  { id: 'halo', title: 'Halo, Python!', sub: 'print()',
+    desc: 'Tulis program yang mencetak tepat: <code>Halo, Python!</code>',
+    starter: '# Tulis kodemu di bawah ini\n',
+    tests: [{ stdin: '', out: 'Halo, Python!' }],
+    hint: 'Gunakan print("...") dan perhatikan huruf besar, koma, dan tanda seru.',
+    sol: 'print("Halo, Python!")' },
+  { id: 'luas', title: 'Luas Persegi Panjang', sub: 'input() + int()',
+    desc: 'Baca dua bilangan bulat: <b>panjang</b> lalu <b>lebar</b> (masing-masing dengan <code>input()</code>). Cetak luasnya saja.',
+    starter: 'panjang = int(input("Panjang: "))\n# lanjutkan di sini\n',
+    tests: [{ stdin: '5\n3', out: '15' }, { stdin: '10\n2', out: '20' }],
+    hint: 'Luas = panjang * lebar. Ubah input menjadi angka dengan int().',
+    sol: 'panjang = int(input("Panjang: "))\nlebar = int(input("Lebar: "))\nprint(panjang * lebar)' },
+  { id: 'ganjil', title: 'Ganjil atau Genap', sub: 'if – else, %',
+    desc: 'Baca satu bilangan bulat. Cetak <code>Genap</code> jika habis dibagi 2, selain itu cetak <code>Ganjil</code>.',
+    starter: 'n = int(input("Bilangan: "))\n',
+    tests: [{ stdin: '4', out: 'Genap' }, { stdin: '7', out: 'Ganjil' }, { stdin: '0', out: 'Genap' }],
+    hint: 'Operator sisa bagi: n % 2 == 0 berarti genap.',
+    sol: 'n = int(input("Bilangan: "))\nif n % 2 == 0:\n    print("Genap")\nelse:\n    print("Ganjil")' },
+  { id: 'hitung', title: 'Hitung 1 sampai n', sub: 'for + range()',
+    desc: 'Baca <b>n</b>, lalu cetak angka 1 sampai n, satu angka per baris.',
+    starter: 'n = int(input("n: "))\n',
+    tests: [{ stdin: '5', out: '1\n2\n3\n4\n5' }, { stdin: '2', out: '1\n2' }],
+    hint: 'for i in range(1, n + 1): lalu print(i).',
+    sol: 'n = int(input("n: "))\nfor i in range(1, n + 1):\n    print(i)' },
+  { id: 'terbesar', title: 'Terbesar dari Tiga', sub: 'if – elif / max()',
+    desc: 'Baca tiga bilangan bulat (tiga kali <code>input()</code>). Cetak bilangan yang paling besar.',
+    starter: 'a = int(input())\nb = int(input())\nc = int(input())\n',
+    tests: [{ stdin: '3\n9\n4', out: '9' }, { stdin: '-1\n-5\n-2', out: '-1' }, { stdin: '7\n7\n2', out: '7' }],
+    hint: 'Bisa memakai max(a, b, c) atau membandingkan dengan if – elif.',
+    sol: 'a = int(input())\nb = int(input())\nc = int(input())\nprint(max(a, b, c))' },
+  { id: 'jumlahgenap', title: 'Jumlah Bilangan Genap', sub: 'for + if',
+    desc: 'Baca <b>n</b>. Cetak jumlah semua bilangan genap dari 1 sampai n.',
+    starter: 'n = int(input("n: "))\ntotal = 0\n',
+    tests: [{ stdin: '10', out: '30' }, { stdin: '5', out: '6' }, { stdin: '1', out: '0' }],
+    hint: 'Ulangi i dari 1 sampai n; jika i % 2 == 0, tambahkan ke total.',
+    sol: 'n = int(input("n: "))\ntotal = 0\nfor i in range(1, n + 1):\n    if i % 2 == 0:\n        total += i\nprint(total)' },
+  { id: 'konsonan', title: 'Hitung Huruf Konsonan', sub: 'string + perulangan',
+    desc: 'Baca satu kata. Cetak banyaknya huruf <b>konsonan</b> (huruf alfabet selain a, i, u, e, o; huruf besar/kecil sama saja).',
+    starter: 'text = input("Kata: ")\n',
+    tests: [{ stdin: 'ORANGE', out: '3' }, { stdin: 'Python', out: '5' }],
+    hint: 'Mirip contoh hitung vokal: char.isalpha() and char.lower() not in "aeiou".',
+    sol: 'text = input("Kata: ")\ncount = sum(char.isalpha() and char.lower() not in "aeiou" for char in text)\nprint(count)' },
+  { id: 'balik', title: 'Membalik Kalimat', sub: 'slicing',
+    desc: 'Baca satu kalimat, lalu cetak kalimat tersebut dalam urutan terbalik.',
+    starter: 'kalimat = input("Kalimat: ")\n',
+    tests: [{ stdin: 'halo dunia', out: 'ainud olah' }, { stdin: 'Python', out: 'nohtyP' }],
+    hint: 'Slicing kalimat[::-1] membalik string.',
+    sol: 'kalimat = input("Kalimat: ")\nprint(kalimat[::-1])' },
+];
+
+// ---------- Utilitas ----------
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const TOKEN = /(#.*$)|(f?"[^"]*"|'[^']*')|\b(for|in|if|elif|else|while|break|return|def|True|False|None|and|or|not)\b|\b(print|input|sum|len|int|range|str|list)\b|\b(\d+)\b/g;
 const highlight = line => esc(line).replace(TOKEN, (m, com, str, kw, fn, num) =>
   com ? `<span class="tk-com">${m}</span>` : str ? `<span class="tk-str">${m}</span>` :
   kw ? `<span class="tk-kw">${m}</span>` : fn ? `<span class="tk-fn">${m}</span>` : `<span class="tk-num">${m}</span>`);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('bpv:' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('bpv:' + k, JSON.stringify(v)); } catch {} },
+};
 
-let lesson, steps = [], idx = 0, timer = null;
-const solved = new Set();
-
-function renderNav() {
-  $('nav').innerHTML = '<h3>MATERI</h3>' + LESSONS.map((l, i) =>
-    `<button data-i="${i}" class="${l === lesson ? 'active' : ''}"><span>${i + 1}. ${l.menu}</span>${solved.has(i) ? '<b class="done-mark">✔</b>' : ''}<small>${l.sub}</small></button>`).join('');
-}
-
+// ---------- Tampilan variabel & output ----------
 function renderVar(v) {
   const wrap = document.createElement('div');
   wrap.className = 'var' + (v.changed ? ' changed' : '');
@@ -566,44 +731,145 @@ function renderVar(v) {
       const cells = items.map((c, i) => `<div class="cell ${hl[i] || ''}">${esc(c)}</div>`).join('');
       const ptrs = (v.ptrs || []).map(p =>
         `<div class="ptr ${p.alt ? 'alt' : ''}" style="left:${p.i * cw + cw / 2}px"><span class="arrow">↑</span><span class="pname">${esc(p.name)}</span><span class="pval">${esc(p.val)}</span></div>`).join('');
-      body = `<div class="cells ${v.kind} ${v.mark ? 'mark-' + v.mark : ''}">${cells}</div>` +
+      body = `<div class="cells ${v.kind} ${v.auto ? 'auto' : ''} ${v.mark ? 'mark-' + v.mark : ''}">${cells}</div>` +
         (v.ptrs ? `<div class="ptr-row" style="width:${items.length * cw}px">${ptrs}</div>` : '');
     }
   } else if (v.kind === 'bool') {
     body = `<div class="box bool-${v.value}">${v.value ? 'True' : 'False'}</div>`;
+  } else if (v.kind === 'fn') {
+    body = `<div class="box fn">${esc(v.value)}</div>`;
   } else {
-    body = `<div class="box">${esc(v.value)}</div>`;
+    body = `<div class="box ${String(v.value).length > 12 ? 'small' : ''}">${esc(v.value)}</div>`;
   }
   wrap.innerHTML = `<div class="name">${esc(v.name)}</div>${body}`;
   return wrap;
 }
 
-function render() {
-  const s = steps[idx];
-  const stage = $('stage'); stage.innerHTML = '';
-  s.vars.forEach(v => stage.appendChild(renderVar(v)));
+const outHtml = out => out.map(o =>
+  esc(o.text) + (o.input !== undefined ? `<span class="in">${esc(o.input)}</span>` : '') +
+  (o.enter ? '<span class="enter">↵</span>' : '') + (o.typing ? '<span class="cursor"></span>' : '')).join('\n');
+const segsHtml = segs => segs.map(([k, t]) =>
+  k === 'i' ? `<span class="in">${esc(t)}</span>` : k === 'e' ? `<span class="err">${esc(t)}</span>` : esc(t)).join('');
 
-  $('output').innerHTML = s.out.map(o =>
-    esc(o.text) + (o.input !== undefined ? `<span class="in">${esc(o.input)}</span>` : '') +
-    (o.enter ? '<span class="enter">↵</span>' : '') + (o.typing ? '<span class="cursor"></span>' : '')).join('\n');
+const controlsHtml = p => `<div class="controls">
+  <button class="btn" id="${p}reset" title="Ulang (R)">⏮</button>
+  <button class="btn" id="${p}prev" title="Mundur (←)">◀</button>
+  <button class="btn primary" id="${p}play" title="Putar / jeda (Spasi)">▶ Putar</button>
+  <button class="btn" id="${p}next" title="Maju (→)">▶|</button>
+  <select class="btn" id="${p}speed" title="Kecepatan">
+    <option value="1600">0.5×</option><option value="900" selected>1×</option><option value="450">2×</option>
+  </select>
+  <div class="progress"><div class="bar"><i id="${p}bar"></i></div><span id="${p}info"></span></div>
+</div>`;
 
-  $('code').querySelectorAll('.ln').forEach((el, i) => el.classList.toggle('active', i + 1 === s.line));
-  $('note').innerHTML = s.note;
-  $('stepInfo').textContent = `${idx + 1}/${steps.length}`;
-  $('barFill').style.width = `${(idx + 1) / steps.length * 100}%`;
-  $('bPrev').disabled = idx === 0;
-  $('bNext').disabled = idx === steps.length - 1;
+// Pemutar langkah: dipakai oleh Materi (L) dan Editor (E)
+function Player(p, onLine) {
+  $(p + 'ctl').innerHTML = controlsHtml(p);
+  const el = id => $(p + id);
+  let steps = [], idx = 0, timer = null;
+
+  function draw() {
+    const s = steps[idx];
+    const stage = el('stage');
+    stage.innerHTML = '';
+    let grp;
+    s.vars.forEach(v => {
+      if (v.group !== grp && v.group) {
+        const h = document.createElement('div');
+        h.className = 'grp'; h.textContent = 'variabel lokal di ' + v.group;
+        stage.appendChild(h);
+      }
+      grp = v.group;
+      stage.appendChild(renderVar(v));
+    });
+    if (!s.vars.length) stage.innerHTML = '<div class="empty-stage">Belum ada variabel.</div>';
+    el('output').innerHTML = s.segs ? segsHtml(s.segs) : outHtml(s.out);
+    el('output').scrollTop = el('output').scrollHeight;
+    el('note').innerHTML = s.note;
+    el('info').textContent = `${idx + 1}/${steps.length}`;
+    el('bar').style.width = `${(idx + 1) / steps.length * 100}%`;
+    el('prev').disabled = idx === 0;
+    el('next').disabled = idx === steps.length - 1;
+    el('play').disabled = steps.length < 2;
+    onLine(s.line, s.err);
+  }
+  function stop() { clearInterval(timer); timer = null; el('play').textContent = '▶ Putar'; }
+  function play() {
+    if (steps.length < 2) return;
+    if (idx === steps.length - 1) { idx = 0; draw(); }
+    el('play').textContent = '⏸ Jeda';
+    timer = setInterval(() => {
+      if (idx < steps.length - 1) { idx++; draw(); }
+      if (idx === steps.length - 1) stop();
+    }, +el('speed').value);
+  }
+  const go = d => { stop(); idx = Math.max(0, Math.min(steps.length - 1, idx + d)); draw(); };
+  const toggle = () => timer ? stop() : play();
+  const reset = () => { stop(); idx = 0; draw(); };
+
+  el('play').onclick = toggle;
+  el('prev').onclick = () => go(-1);
+  el('next').onclick = () => go(1);
+  el('reset').onclick = reset;
+  el('speed').onchange = () => { if (timer) { stop(); play(); } };
+
+  return {
+    load(s, autoplay) { stop(); steps = s; idx = 0; draw(); if (autoplay) play(); },
+    stop, toggle, go, reset,
+  };
 }
 
-function build(inp) {
+// ---------- State ----------
+let mode = 'materi', lesson, editorCtx = null;
+const solvedQuiz = new Set(store.get('quiz', []));
+const solvedTask = new Set(store.get('tasks', []));
+
+// ---------- Navigasi ----------
+function renderNav() {
+  let html;
+  if (mode === 'materi') {
+    html = '<h3>MATERI</h3>' + LESSONS.map((l, i) =>
+      `<button data-i="${i}" class="${l === lesson ? 'active' : ''}"><span>${i + 1}. ${l.menu}</span>${solvedQuiz.has(i) ? '<b class="done-mark">✔</b>' : ''}<small>${l.sub}</small></button>`).join('');
+  } else if (mode === 'editor') {
+    html = '<h3>CONTOH KODE</h3>' + EXAMPLES.map((e, i) =>
+      `<button data-i="${i}" class="${editorCtx && editorCtx.key === 'ex:' + i ? 'active' : ''}"><span>${e.name}</span><small>${e.sub}</small></button>`).join('');
+  } else {
+    html = `<h3>LATIHAN (${solvedTask.size}/${TASKS.length} SELESAI)</h3>` + TASKS.map((t, i) =>
+      `<button data-i="${i}" class="${editorCtx && editorCtx.key === 'task:' + t.id ? 'active' : ''}"><span>${i + 1}. ${t.title}</span>${solvedTask.has(t.id) ? '<b class="done-mark">✔</b>' : ''}<small>${t.sub}</small></button>`).join('');
+  }
+  $('nav').innerHTML = html;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+}
+
+function setMode(m) {
+  mode = m;
+  LP.stop(); EP.stop();
+  $('viewLesson').hidden = m !== 'materi';
+  $('viewEditor').hidden = m === 'materi';
+  if (m === 'materi') openLesson(lesson ? LESSONS.indexOf(lesson) : 0);
+  else if (m === 'editor' && (!editorCtx || editorCtx.task)) openExample(1);
+  else if (m === 'latihan' && (!editorCtx || !editorCtx.task)) openTask(0);
+  else renderNav();
+  if (m !== 'materi') { loadPy(); editor.refresh(); }
+}
+
+$('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
+$('nav').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const i = +b.dataset.i;
+  if (mode === 'materi') openLesson(i); else if (mode === 'editor') openExample(i); else openTask(i);
+});
+
+// ---------- Materi ----------
+const LP = Player('L', line => $('code').querySelectorAll('.ln').forEach((el, i) => el.classList.toggle('active', i + 1 === line)));
+
+function buildLesson(inp) {
   const T = Tracer();
   lesson.trace(inp, T);
-  steps = T.steps; idx = 0;
-  render();
+  return T.steps;
 }
 
 function openLesson(i) {
-  stop();
   lesson = LESSONS[i];
   renderNav();
   $('lessonNo').textContent = `MATERI ${i + 1}`;
@@ -611,11 +877,12 @@ function openLesson(i) {
   $('code').innerHTML = lesson.code.map((l, n) => `<div class="ln"><span class="no">${n + 1}</span><span>${highlight(l)}</span></div>`).join('');
   $('userInput').value = lesson.input;
   $('inputHint').textContent = lesson.hint;
+  $('inputHint').style.color = '';
   $('concept').innerHTML = lesson.concept;
   $('chips').innerHTML = lesson.chips.map(c => `<span class="chip">${esc(c)}</span>`).join('');
   $('quizQ').innerHTML = lesson.quiz.q;
   $('quizA').value = ''; $('quizFb').textContent = ''; $('quizFb').className = 'fb';
-  build(lesson.input);
+  LP.load(buildLesson(lesson.input));
 }
 
 function validInput(v) {
@@ -629,30 +896,12 @@ function validInput(v) {
   return '';
 }
 
-// ---------- Kontrol ----------
-function stop() { clearInterval(timer); timer = null; $('bPlay').textContent = '▶ Putar'; }
-function play() {
-  if (idx === steps.length - 1) { idx = 0; render(); }
-  $('bPlay').textContent = '⏸ Jeda';
-  timer = setInterval(() => {
-    if (idx < steps.length - 1) { idx++; render(); }
-    if (idx === steps.length - 1) stop();
-  }, +$('speed').value);
-}
-const go = d => { stop(); idx = Math.max(0, Math.min(steps.length - 1, idx + d)); render(); };
-
-$('nav').addEventListener('click', e => { const b = e.target.closest('button'); if (b) openLesson(+b.dataset.i); });
-$('bPlay').onclick = () => timer ? stop() : play();
-$('bPrev').onclick = () => go(-1);
-$('bNext').onclick = () => go(1);
-$('bReset').onclick = () => { stop(); idx = 0; render(); };
-$('speed').onchange = () => { if (timer) { stop(); play(); } };
 $('bRun').onclick = () => {
   const err = validInput($('userInput').value);
   $('inputHint').textContent = err || lesson.hint;
   $('inputHint').style.color = err ? '#f87171' : '';
   if (err) return;
-  stop(); build($('userInput').value.trim()); play();
+  LP.load(buildLesson($('userInput').value.trim()), true);
 };
 $('userInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('bRun').click(); });
 
@@ -663,19 +912,412 @@ $('bQuiz').onclick = () => {
   const ok = got === want || got === value;
   $('quizFb').className = 'fb ' + (ok ? 'ok' : 'no');
   $('quizFb').textContent = ok ? `Benar! Output: ${lesson.quiz.a}` : 'Belum tepat. Coba jalankan dengan input tersebut lalu perhatikan langkahnya.';
-  if (ok) { solved.add(LESSONS.indexOf(lesson)); renderNav(); }
+  if (ok) { solvedQuiz.add(LESSONS.indexOf(lesson)); store.set('quiz', [...solvedQuiz]); renderNav(); }
 };
 $('quizA').addEventListener('keydown', e => { if (e.key === 'Enter') $('bQuiz').click(); });
 
+$('bToEditor').onclick = () => {
+  const i = LESSONS.indexOf(lesson);
+  mode = 'editor';
+  $('viewLesson').hidden = true; $('viewEditor').hidden = false;
+  LP.stop();
+  openEditor({ key: 'lesson:' + i, kicker: `MATERI ${i + 1} · EDITOR`, title: lesson.title, code: lesson.code.join('\n') + '\n', stdin: $('userInput').value.trim() || lesson.input });
+  loadPy(); editor.refresh();
+};
+
+// ---------- Editor kode ----------
+function makeEditor(host, onRun) {
+  if (window.CodeMirror) {
+    const cm = CodeMirror(host, {
+      mode: 'python', lineNumbers: true, indentUnit: 4, tabSize: 4, indentWithTabs: false, matchBrackets: true,
+      extraKeys: {
+        Tab: c => c.somethingSelected() ? c.indentSelection('add') : c.replaceSelection('    ', 'end'),
+        'Shift-Tab': c => c.indentSelection('subtract'),
+        'Ctrl-Enter': () => onRun(false), 'Cmd-Enter': () => onRun(false),
+        'Shift-Ctrl-Enter': () => onRun(true), 'Shift-Cmd-Enter': () => onRun(true),
+      },
+    });
+    let marked = [];
+    return {
+      get: () => cm.getValue(),
+      set: v => cm.setValue(v),
+      onChange: f => cm.on('change', f),
+      refresh: () => setTimeout(() => cm.refresh(), 0),
+      mark(line, cls) {
+        marked.forEach(([l, c]) => cm.removeLineClass(l, 'background', c));
+        marked = [];
+        if (line && line <= cm.lineCount()) {
+          cm.addLineClass(line - 1, 'background', cls);
+          marked.push([line - 1, cls]);
+          cm.scrollIntoView({ line: line - 1, ch: 0 }, 60);
+        }
+      },
+    };
+  }
+  // Cadangan jika CodeMirror gagal dimuat
+  const ta = document.createElement('textarea');
+  ta.className = 'plain-editor'; ta.spellcheck = false;
+  host.appendChild(ta);
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Tab') { e.preventDefault(); ta.setRangeText('    ', ta.selectionStart, ta.selectionEnd, 'end'); }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); onRun(e.shiftKey); }
+  });
+  return { get: () => ta.value, set: v => ta.value = v, onChange: f => ta.addEventListener('input', f), refresh() {}, mark() {} };
+}
+
+const editor = makeEditor($('cm'), trace => runCode(trace));
+editor.onChange(() => { if (editorCtx) store.set('code:' + editorCtx.key, editor.get()); });
+const EP = Player('E', (line, err) => editor.mark(line, err ? 'cm-err' : 'cm-step'));
+
+function idleStep(note) {
+  return [{ line: 0, vars: [], segs: [], note }];
+}
+
+function openEditor(ctx) {
+  editorCtx = ctx;
+  renderNav();
+  $('edKicker').textContent = ctx.kicker;
+  $('edTitle').textContent = ctx.title;
+  editor.set(store.get('code:' + ctx.key, ctx.code));
+  $('stdin').value = ctx.stdin || '';
+  const t = ctx.task;
+  $('task').hidden = !t;
+  if (t) {
+    $('taskDesc').innerHTML = t.desc;
+    $('taskTests').innerHTML = t.tests.map(x =>
+      `<div>Input: <b>${x.stdin ? esc(x.stdin.replace(/\n/g, ' ⏎ ')) : '(tidak ada)'}</b> → Output: <b>${esc(x.out.replace(/\n/g, ' ⏎ '))}</b></div>`).join('');
+    $('taskFb').textContent = solvedTask.has(t.id) ? '✔ Latihan ini sudah pernah kamu selesaikan.' : '';
+    $('taskFb').className = 'fb ok';
+    $('taskExtra').hidden = true;
+  }
+  EP.load(idleStep('Tulis kode lalu tekan <b>▶ Jalankan</b> (Ctrl + Enter), atau <b>🔍 Langkah demi Langkah</b> untuk melihat cara kode berjalan baris per baris.'));
+  editor.mark(0);
+}
+
+function openExample(i) {
+  const e = EXAMPLES[i];
+  openEditor({ key: 'ex:' + i, kicker: 'EDITOR KODE', title: e.name.toUpperCase(), code: e.code, stdin: e.stdin });
+}
+function openTask(i) {
+  const t = TASKS[i];
+  openEditor({ key: 'task:' + t.id, kicker: `LATIHAN ${i + 1}`, title: t.title.toUpperCase(), code: t.starter, task: t });
+}
+
+$('bResetCode').onclick = () => {
+  if (!editorCtx || !confirm('Kembalikan kode ke versi awal? Perubahanmu akan hilang.')) return;
+  editor.set(editorCtx.code);
+  store.set('code:' + editorCtx.key, editorCtx.code);
+};
+
+// ---------- Python (Pyodide) ----------
+const PY_HARNESS = String.raw`
+import sys, json, types, builtins, traceback
+from js import prompt as _js_prompt
+
+class _Stop(BaseException):
+    pass
+
+class _Out:
+    def __init__(self, segs, kind):
+        self.segs, self.kind = segs, kind
+    def write(self, t):
+        if t:
+            self.segs.append([self.kind, t])
+        return len(t)
+    def flush(self):
+        pass
+
+def _short(r, n=40):
+    return r if len(r) <= n else r[:n - 1] + '…'
+
+def _ser(v):
+    if isinstance(v, bool):
+        return {'kind': 'bool', 'value': v}
+    if isinstance(v, (int, float)):
+        return {'kind': 'num', 'value': _short(repr(v), 20)}
+    if isinstance(v, str):
+        if 0 < len(v) <= 16 and '\n' not in v:
+            return {'kind': 'str', 'value': v}
+        return {'kind': 'box', 'value': _short(repr(v))}
+    if isinstance(v, (list, tuple)) and 0 < len(v) <= 12 and all(
+            isinstance(x, (int, float, str, bool)) and len(repr(x)) <= 10 for x in v):
+        return {'kind': 'list', 'value': [repr(x) for x in v]}
+    if isinstance(v, types.FunctionType):
+        return {'kind': 'fn', 'value': 'def ' + v.__name__ + '()'}
+    if isinstance(v, type):
+        return {'kind': 'fn', 'value': 'class ' + v.__name__}
+    return {'kind': 'box', 'value': _short(repr(v))}
+
+def _vars(d):
+    return [[k, _ser(v)] for k, v in list(d.items())
+            if not k.startswith('__') and not isinstance(v, types.ModuleType)]
+
+def _groups(frame):
+    stack = []
+    f = frame
+    while f is not None and f.f_code.co_filename == '<user>':
+        stack.append(f)
+        f = f.f_back
+    stack.reverse()
+    groups = [{'name': 'global', 'vars': _vars(stack[0].f_globals)}] if stack else []
+    for f in stack:
+        name = f.f_code.co_name
+        if not name.startswith('<'):
+            groups.append({'name': name, 'vars': _vars(f.f_locals)})
+    return groups
+
+def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
+    segs, steps = [], []
+    lines_in = stdin.split('\n') if stdin else []
+    state = {'count': 0, 'truncated': False}
+    pending = {}
+    ns = {'__name__': '__main__'}
+    b = dict(builtins.__dict__)
+
+    def _input(p=''):
+        p = str(p)
+        if p:
+            segs.append(['p', p])
+        if lines_in:
+            v = lines_in.pop(0)
+        elif interactive:
+            r = _js_prompt(p or 'Masukkan input:')
+            if r is None:
+                raise _Stop('Input dibatalkan.')
+            v = str(r)
+        else:
+            raise EOFError('input() dipanggil lebih banyak dari data input yang tersedia')
+        segs.append(['i', v + '\n'])
+        return v
+
+    b['input'] = _input
+    ns['__builtins__'] = b
+
+    def emit(line, frame):
+        if len(steps) >= max_steps:
+            state['truncated'] = True
+            return
+        steps.append({'line': line, 'groups': _groups(frame), 'segs': [list(s) for s in segs]})
+
+    def tr(frame, event, arg):
+        if frame.f_code.co_filename != '<user>':
+            return None
+        if event == 'line':
+            state['count'] += 1
+            if state['count'] > max_lines:
+                raise _Stop('Program dihentikan: terlalu banyak langkah (kemungkinan perulangan tanpa akhir).')
+            if trace:
+                k = id(frame)
+                if k in pending:
+                    emit(pending[k], frame)
+                pending[k] = frame.f_lineno
+        elif event == 'return' and trace:
+            k = id(frame)
+            if k in pending:
+                emit(pending.pop(k), frame)
+        return tr
+
+    err = None
+    old = sys.stdout, sys.stderr
+    sys.stdout, sys.stderr = _Out(segs, 'o'), _Out(segs, 'e')
+    try:
+        code = compile(src, '<user>', 'exec')
+        sys.settrace(tr)
+        try:
+            exec(code, ns)
+        finally:
+            sys.settrace(None)
+    except _Stop as e:
+        err = {'type': 'Stop', 'msg': str(e), 'line': None}
+    except SyntaxError as e:
+        err = {'type': type(e).__name__, 'msg': e.msg, 'line': e.lineno}
+    except BaseException as e:
+        tb = [f for f in traceback.extract_tb(e.__traceback__) if f.filename == '<user>']
+        err = {'type': type(e).__name__, 'msg': str(e), 'line': tb[-1].lineno if tb else None}
+    finally:
+        sys.stdout, sys.stderr = old
+    if err:
+        text = err['msg'] if err['type'] == 'Stop' else err['type'] + (': ' + err['msg'] if err['msg'] else '')
+        if err['line']:
+            text += '  (baris %d)' % err['line']
+        segs.append(['e', text + '\n'])
+    return json.dumps({'steps': steps, 'segs': segs, 'err': err,
+                       'final': [{'name': 'global', 'vars': _vars(ns)}], 'truncated': state['truncated']})
+`;
+
+const PYODIDE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+let pyPromise = null;
+function setStatus(text, cls = '') { $('pyStatus').textContent = text; $('pyStatus').className = 'status ' + cls; }
+function loadPy() {
+  if (!pyPromise) {
+    setStatus('⏳ Memuat Python… (pertama kali ±10 MB)');
+    pyPromise = new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = PYODIDE_URL + 'pyodide.js';
+      s.onload = res; s.onerror = () => rej(new Error('script'));
+      document.head.appendChild(s);
+    })
+      .then(() => loadPyodide({ indexURL: PYODIDE_URL }))
+      .then(py => { py.runPython(PY_HARNESS); setStatus('✔ Python siap', 'ok'); return py; })
+      .catch(e => { pyPromise = null; setStatus('✘ Gagal memuat Python. Periksa koneksi internet lalu coba lagi.', 'bad'); throw e; });
+  }
+  return pyPromise;
+}
+
+async function pyRun(src, stdin, trace, interactive = true) {
+  const py = await loadPy();
+  const fn = py.globals.get('_run');
+  try { return JSON.parse(fn(src, stdin, trace, interactive)); } finally { fn.destroy(); }
+}
+
+const ERR_HELP = {
+  SyntaxError: 'Penulisan kode tidak sesuai aturan Python. Periksa titik dua (:) setelah if/for/while/def, pasangan kurung, dan tanda kutip.',
+  IndentationError: 'Indentasi (spasi di awal baris) tidak tepat. Isi blok if/for/while/def harus menjorok ke dalam dengan jumlah spasi yang sama.',
+  TabError: 'Campuran Tab dan spasi pada indentasi. Gunakan 4 spasi saja.',
+  NameError: 'Nama variabel atau fungsi belum dibuat, atau salah ketik. Ingat: Python membedakan huruf besar dan kecil.',
+  TypeError: 'Operasi memakai tipe data yang tidak cocok, misalnya teks + angka. Ubah tipenya dengan int(), float(), atau str().',
+  ValueError: 'Nilainya tidak bisa diproses, misalnya int("abc") atau int("") karena teks bukan angka.',
+  ZeroDivisionError: 'Pembagian dengan nol tidak diperbolehkan.',
+  IndexError: 'Indeks di luar jangkauan. Indeks dimulai dari 0 sampai len(...) - 1.',
+  KeyError: 'Kunci tersebut tidak ada di dictionary.',
+  AttributeError: 'Tipe data ini tidak memiliki method/atribut tersebut. Periksa ejaannya.',
+  EOFError: 'Program meminta input lebih banyak daripada data yang diberikan.',
+  RecursionError: 'Fungsi memanggil dirinya sendiri terlalu dalam (rekursi tanpa akhir).',
+};
+function errNote(err) {
+  if (err.type === 'Stop') return `<b>⛔ ${esc(err.msg)}</b>`;
+  const where = err.line ? ` di <b>baris ${err.line}</b>` : '';
+  return `<b>❌ ${esc(err.type)}</b>${where}: ${esc(err.msg)}<br>${ERR_HELP[err.type] || 'Baca pesan error di atas untuk mencari penyebabnya.'}`;
+}
+
+const fmtVal = v => v.kind === 'str' ? `"${v.value}"` : v.kind === 'list' ? `[${v.value.join(', ')}]` :
+  v.kind === 'bool' ? (v.value ? 'True' : 'False') : v.value;
+const outText = segs => segs.filter(s => s[0] === 'o').map(s => s[1]).join('');
+
+function toVars(groups, prev) {
+  const vars = [], cur = {};
+  groups.forEach(g => g.vars.forEach(([k, v]) => {
+    const key = g.name + '.' + k, j = JSON.stringify(v);
+    cur[key] = j;
+    vars.push({ name: k, ...v, auto: true, group: g.name === 'global' ? null : g.name + '()', changed: prev !== null && prev[key] !== j });
+  }));
+  return { vars, cur };
+}
+
+function traceSteps(res, src) {
+  const lines = src.split('\n');
+  let prev = {}, prevOut = '';
+  const steps = res.steps.map(s => {
+    const { vars, cur } = toVars(s.groups, prev);
+    const changes = vars.filter(v => v.changed && v.kind !== 'fn').map(v => `<b>${esc(v.name)}</b> = ${esc(fmtVal(v))}`);
+    const out = outText(s.segs);
+    const printed = out.length > prevOut.length ? out.slice(prevOut.length).trimEnd() : '';
+    let note = `Baris ${s.line}: <code>${esc((lines[s.line - 1] || '').trim())}</code>`;
+    if (changes.length) note += `<br>→ ${changes.join(', ')}`;
+    if (printed) note += `<br>→ mencetak: <code>${esc(printed)}</code>`;
+    prev = cur; prevOut = out;
+    return { line: s.line, vars, segs: s.segs, note };
+  });
+  const last = steps[steps.length - 1];
+  if (res.err) {
+    steps.push({ line: res.err.line, err: true, vars: last ? last.vars.map(v => ({ ...v, changed: false })) : [], segs: res.segs, note: errNote(res.err) });
+  } else if (last) {
+    last.segs = res.segs;
+    last.note += '<br><b>✔ Program selesai.</b>' + (res.truncated ? ' (Visualisasi dibatasi 400 langkah pertama.)' : '');
+  } else {
+    steps.push({ line: 0, vars: [], segs: res.segs, note: 'Tidak ada baris yang dijalankan.' });
+  }
+  return steps;
+}
+
+let running = false;
+async function runCode(trace) {
+  if (running) return;
+  running = true;
+  $('bRunCode').disabled = $('bTrace').disabled = true;
+  EP.stop();
+  try {
+    await loadPy();
+    setStatus('⏳ Menjalankan…');
+    await new Promise(r => setTimeout(r, 30));
+    const src = editor.get();
+    const res = await pyRun(src, $('stdin').value, trace);
+    if (trace) {
+      EP.load(traceSteps(res, src), true);
+    } else {
+      const { vars } = toVars(res.final, null);
+      EP.load([{ line: res.err ? res.err.line : 0, err: !!res.err, vars, segs: res.segs,
+        note: res.err ? errNote(res.err) : '<b>✔ Program selesai.</b> Kotak di atas menunjukkan nilai akhir setiap variabel. Tekan <b>🔍 Langkah demi Langkah</b> untuk melihat prosesnya.' }]);
+    }
+    setStatus(res.err ? '✘ Ada error' : '✔ Selesai', res.err ? 'bad' : 'ok');
+  } catch (e) {
+    console.error(e);
+  } finally {
+    running = false;
+    $('bRunCode').disabled = $('bTrace').disabled = false;
+  }
+}
+
+$('bRunCode').onclick = () => runCode(false);
+$('bTrace').onclick = () => runCode(true);
+
+// ---------- Penilaian latihan ----------
+const normOut = s => s.replace(/\r/g, '').split('\n').map(l => l.trimEnd()).join('\n').replace(/\n+$/, '');
+
+$('bCheck').onclick = async () => {
+  const t = editorCtx && editorCtx.task;
+  if (!t || running) return;
+  running = true;
+  $('bCheck').disabled = true;
+  $('taskFb').className = 'fb'; $('taskFb').textContent = '⏳ Memeriksa…';
+  try {
+    const src = editor.get();
+    const rows = $('taskTests').children;
+    let pass = 0;
+    for (let i = 0; i < t.tests.length; i++) {
+      const x = t.tests[i];
+      const res = await pyRun(src, x.stdin, false, false);
+      const got = normOut(outText(res.segs));
+      const ok = !res.err && got === normOut(x.out);
+      if (ok) pass++;
+      rows[i].className = ok ? 'pass' : 'fail';
+      rows[i].innerHTML = `${ok ? '✔' : '✘'} Input: <b>${x.stdin ? esc(x.stdin.replace(/\n/g, ' ⏎ ')) : '(tidak ada)'}</b> → harus <b>${esc(x.out.replace(/\n/g, ' ⏎ '))}</b>` +
+        (ok ? '' : ` · hasilmu: <b>${res.err ? esc(res.err.type) : esc(got.replace(/\n/g, ' ⏎ ') || '(kosong)')}</b>`);
+    }
+    const all = pass === t.tests.length;
+    $('taskFb').className = 'fb ' + (all ? 'ok' : 'no');
+    $('taskFb').textContent = all ? '🎉 Semua tes lulus! Latihan selesai.' : `${pass} dari ${t.tests.length} tes lulus. Cek bagian yang ✘, lalu perbaiki kodemu. Ingat: cetak hasilnya saja, tanpa teks tambahan.`;
+    if (all) { solvedTask.add(t.id); store.set('tasks', [...solvedTask]); renderNav(); }
+  } catch (e) {
+    $('taskFb').className = 'fb no'; $('taskFb').textContent = 'Python belum siap. Coba lagi sebentar.';
+  } finally {
+    running = false;
+    $('bCheck').disabled = false;
+  }
+};
+$('bHint').onclick = () => {
+  const t = editorCtx.task;
+  $('taskExtra').hidden = false; $('taskExtra').innerHTML = '💡 ' + esc(t.hint);
+};
+$('bSol').onclick = () => {
+  const t = editorCtx.task;
+  if (!confirm('Lihat solusi? Coba kerjakan sendiri dulu ya.')) return;
+  $('taskExtra').hidden = false;
+  $('taskExtra').innerHTML = `<b>Contoh solusi:</b>\n<code>${esc(t.sol)}</code>\n\n<button class="btn" id="bUseSol">Salin ke editor</button>`;
+  $('bUseSol').onclick = () => editor.set(t.sol + '\n');
+};
+
+// ---------- Keyboard ----------
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-  if (e.key === 'ArrowRight') go(1);
-  else if (e.key === 'ArrowLeft') go(-1);
-  else if (e.key === ' ') { e.preventDefault(); timer ? stop() : play(); }
-  else if (e.key.toLowerCase() === 'r') $('bReset').click();
+  if (e.target.closest('input, textarea, select, .CodeMirror')) return;
+  const P = mode === 'materi' ? LP : EP;
+  if (e.key === 'ArrowRight') P.go(1);
+  else if (e.key === 'ArrowLeft') P.go(-1);
+  else if (e.key === ' ') { e.preventDefault(); P.toggle(); }
+  else if (e.key.toLowerCase() === 'r') P.reset();
 });
 
-openLesson(0);
+setMode('materi');
 </script>
 </body>
 </html>
