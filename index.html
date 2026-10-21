@@ -86,6 +86,8 @@
   .grp { flex-basis: 100%; text-align: center; color: var(--kw); font-size: 12px; border-top: 1px dashed var(--border); padding-top: 6px; }
   .var { display: flex; flex-direction: column; align-items: center; animation: pop .25s ease; }
   .var .name { color: var(--cyan); font-size: 12px; margin-bottom: 4px; }
+  .var.pseudo .name { color: var(--kw); }
+  .var.pseudo .cells { border-style: dashed; border-color: var(--kw); }
   .cells { position: relative; display: flex; border: 2px solid var(--cyan); border-radius: 6px; }
   .cell {
     width: var(--cw, 26px); height: 34px; display: grid; place-items: center;
@@ -242,7 +244,7 @@
     <button data-mode="materi">📘 Materi</button>
     <button data-mode="latihan">🏆 Latihan</button>
   </div>
-  <span class="version" id="appVersion" title="Versi aplikasi (naik otomatis setiap commit)">V1.2</span>
+  <span class="version" id="appVersion" title="Versi aplikasi (naik otomatis setiap commit)">V1.3</span>
 </header>
 
 <div class="layout">
@@ -725,7 +727,7 @@ const store = {
 // ---------- Tampilan variabel & output ----------
 function renderVar(v) {
   const wrap = document.createElement('div');
-  wrap.className = 'var' + (v.changed ? ' changed' : '');
+  wrap.className = 'var' + (v.changed ? ' changed' : '') + (v.pseudo ? ' pseudo' : '');
   let body;
   if (v.kind === 'str' || v.kind === 'list') {
     const items = v.kind === 'str' ? [...v.value] : v.value;
@@ -735,7 +737,7 @@ function renderVar(v) {
       const cw = v.kind === 'str' ? 26 : 42;
       const cells = items.map((c, i) => `<div class="cell ${hl[i] || ''}">${esc(c)}</div>`).join('');
       const ptrs = (v.ptrs || []).map(p =>
-        `<div class="ptr ${p.alt ? 'alt' : ''}" style="left:${p.i * cw + cw / 2}px"><span class="arrow">↑</span><span class="pname">${esc(p.name)}</span><span class="pval">${esc(p.val)}</span></div>`).join('');
+        `<div class="ptr ${p.alt ? 'alt' : ''}" data-i="${p.i}" style="left:${p.i * cw + cw / 2}px"><span class="arrow">↑</span><span class="pname">${esc(p.name)}</span><span class="pval">${esc(p.val)}</span></div>`).join('');
       body = `<div class="cells ${v.kind} ${v.auto ? 'auto' : ''} ${v.mark ? 'mark-' + v.mark : ''}">${cells}</div>` +
         (v.ptrs ? `<div class="ptr-row" style="width:${items.length * cw}px">${ptrs}</div>` : '');
     }
@@ -767,6 +769,19 @@ const controlsHtml = p => `<div class="controls">
   <div class="progress"><div class="bar"><i id="${p}bar"></i></div><span id="${p}info"></span></div>
 </div>`;
 
+// Sel list "auto" lebarnya beragam, jadi posisi panah diukur dari sel sebenarnya.
+function alignPtrs(stage) {
+  stage.querySelectorAll('.ptr-row').forEach(row => {
+    const cells = row.previousElementSibling;
+    if (!cells.offsetWidth) return;
+    row.style.width = cells.offsetWidth + 'px';
+    row.querySelectorAll('.ptr').forEach(p => {
+      const c = cells.children[+p.dataset.i];
+      if (c) p.style.left = (cells.clientLeft + c.offsetLeft + c.offsetWidth / 2) + 'px';
+    });
+  });
+}
+
 // Pemutar langkah: dipakai oleh Materi (L) dan Editor (E)
 function Player(p, onLine) {
   $(p + 'ctl').innerHTML = controlsHtml(p);
@@ -788,6 +803,7 @@ function Player(p, onLine) {
       stage.appendChild(renderVar(v));
     });
     if (!s.vars.length) stage.innerHTML = '<div class="empty-stage">Belum ada variabel.</div>';
+    alignPtrs(stage);
     el('output').innerHTML = s.segs ? segsHtml(s.segs) : outHtml(s.out);
     el('output').scrollTop = el('output').scrollHeight;
     el('note').innerHTML = s.note;
@@ -1023,11 +1039,17 @@ class _Stop(BaseException):
     pass
 
 _TICK = '__bpv_tick__'
+_FOR = '__bpv_for__'
 
 class _GuardInjector(ast.NodeTransformer):
     # Menyisipkan __bpv_tick__() di awal setiap badan perulangan dan blok except.
     # Begitu program dihentikan, tick terus melempar _Stop, sehingga "except:" milik
     # pengguna tidak bisa menelannya (melempar dari fungsi trace mematikan tracing).
+    # Iterable setiap "for" juga dibungkus __bpv_for__(id, ...) agar indeks perulangan
+    # bisa ditampilkan sebagai panah pointer; keterangannya disimpan di self.loops.
+    def __init__(self):
+        self.loops = {}
+
     def _guard(self, body):
         call = ast.Expr(ast.Call(ast.Name(_TICK, ast.Load()), [], []))
         ast.copy_location(call, body[0])
@@ -1039,7 +1061,22 @@ class _GuardInjector(ast.NodeTransformer):
         node.body = self._guard(node.body)
         return node
 
-    visit_For = visit_AsyncFor = visit_While
+    visit_AsyncFor = visit_While
+
+    def visit_For(self, node):
+        self.generic_visit(node)
+        node.body = self._guard(node.body)
+        lid = len(self.loops) + 1
+        self.loops[lid] = {
+            'target': ast.unparse(node.target),
+            'label': ast.unparse(node.iter),
+            'src': node.iter.id if isinstance(node.iter, ast.Name) else None,
+            'start': node.lineno,
+            'end': node.end_lineno,
+        }
+        wrapped = ast.Call(ast.Name(_FOR, ast.Load()), [ast.Constant(lid), node.iter], [])
+        node.iter = ast.fix_missing_locations(ast.copy_location(wrapped, node.iter))
+        return node
 
     def visit_ExceptHandler(self, node):
         self.generic_visit(node)
@@ -1081,18 +1118,29 @@ def _vars(d):
     return [[k, _ser(v)] for k, v in list(d.items())
             if not k.startswith('__') and not isinstance(v, types.ModuleType)]
 
-def _groups(frame):
+def _active_loops(f, loops, meta):
+    # Perulangan di frame f yang sedang berjalan: baris aktif frame masih di dalam blok for.
+    out = []
+    for (fid, lid), e in loops.items():
+        m = meta[lid]
+        if fid == id(f) and e['i'] >= 0 and m['start'] <= f.f_lineno <= m['end']:
+            out.append({'key': '%d:%d' % (fid, lid), 'i': e['i'], 'val': e['val'], 'cells': e['cells'],
+                        'target': m['target'], 'label': m['label'], 'src': m['src']})
+    return out
+
+def _groups(frame, loops, meta):
     stack = []
     f = frame
     while f is not None and f.f_code.co_filename == '<user>':
         stack.append(f)
         f = f.f_back
     stack.reverse()
-    groups = [{'name': 'global', 'vars': _vars(stack[0].f_globals)}] if stack else []
-    for f in stack:
+    groups = [{'name': 'global', 'vars': _vars(stack[0].f_globals),
+               'loops': _active_loops(stack[0], loops, meta)}] if stack else []
+    for f in stack[1:]:
         name = f.f_code.co_name
         if not name.startswith('<'):
-            groups.append({'name': name, 'vars': _vars(f.f_locals)})
+            groups.append({'name': name, 'vars': _vars(f.f_locals), 'loops': _active_loops(f, loops, meta)})
     return groups
 
 def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
@@ -1100,6 +1148,8 @@ def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
     lines_in = stdin.split('\n') if stdin else []
     state = {'count': 0, 'truncated': False, 'stopped': None}
     pending = {}
+    loops = {}
+    injector = _GuardInjector()
     ns = {'__name__': '__main__'}
     b = dict(builtins.__dict__)
 
@@ -1127,15 +1177,33 @@ def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
         segs.append(['i', v + '\n'])
         return v
 
+    def _for(lid, it):
+        entry = {'i': -1, 'val': None, 'cells': None}
+        seq = list(it) if isinstance(it, range) and len(it) <= 12 else it
+        if isinstance(seq, (str, list, tuple)):
+            s = _ser(seq)
+            if s['kind'] in ('str', 'list'):
+                entry['cells'] = s
+        loops[(id(sys._getframe(1)), lid)] = entry
+        is_str = isinstance(it, str)
+
+        def gen():
+            for v in it:
+                entry['i'] += 1
+                entry['val'] = v if is_str else _short(repr(v), 12)
+                yield v
+        return gen()
+
     b['input'] = _input
     b[_TICK] = _tick
+    b[_FOR] = _for
     ns['__builtins__'] = b
 
     def emit(line, frame):
         if len(steps) >= max_steps:
             state['truncated'] = True
             return
-        steps.append({'line': line, 'groups': _groups(frame), 'segs': [list(s) for s in segs]})
+        steps.append({'line': line, 'groups': _groups(frame, loops, injector.loops), 'segs': [list(s) for s in segs]})
 
     def tr(frame, event, arg):
         if frame.f_code.co_filename != '<user>':
@@ -1156,13 +1224,16 @@ def _run(src, stdin, trace, interactive=True, max_steps=400, max_lines=200000):
             k = id(frame)
             if k in pending:
                 emit(pending.pop(k), frame)
+            # id frame bisa dipakai ulang oleh frame baru; buang perulangan milik frame yang selesai.
+            for key in [key for key in loops if key[0] == k]:
+                del loops[key]
         return tr
 
     err = None
     old = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = _Out(segs, 'o'), _Out(segs, 'e')
     try:
-        tree = _GuardInjector().visit(ast.parse(src, '<user>'))
+        tree = injector.visit(ast.parse(src, '<user>'))
         code = compile(tree, '<user>', 'exec')
         sys.settrace(tr)
         try:
@@ -1238,25 +1309,53 @@ const fmtVal = v => v.kind === 'str' ? `"${v.value}"` : v.kind === 'list' ? `[${
   v.kind === 'bool' ? (v.value ? 'True' : 'False') : v.value;
 const outText = segs => segs.filter(s => s[0] === 'o').map(s => s[1]).join('');
 
+const cellCount = v => v.kind === 'str' ? [...v.value].length : v.value.length;
+
+// Panah pointer untuk variabel perulangan "for": ditempel ke kotak iterable-nya
+// (mis. text pada "for char in text"), atau ke kotak semu seperti range(1, 6).
+function attachLoops(g, group, vars, cur, prev, moved) {
+  (g.loops || []).forEach(l => {
+    const isCells = v => (v.kind === 'str' || v.kind === 'list') && !v.pseudo;
+    let host = l.src && (vars.find(v => v.name === l.src && v.group === group && isCells(v)) ||
+                         vars.find(v => v.name === l.src && v.group === null && isCells(v)));
+    if (!host && l.cells) {
+      host = { name: l.label, ...l.cells, auto: true, pseudo: true, group, changed: false };
+      vars.push(host);
+    }
+    if (!host || l.i >= cellCount(host)) return;
+    (host.ptrs = host.ptrs || []).push({ i: l.i, name: l.target, val: l.val, alt: host.ptrs.length > 0 });
+    (host.hl = host.hl || []).push({ i: l.i, st: 'hit' });
+    cur['loop:' + l.key] = l.i;
+    if (prev && prev['loop:' + l.key] !== l.i) moved.push(l);
+  });
+}
+
 function toVars(groups, prev) {
-  const vars = [], cur = {};
-  groups.forEach(g => g.vars.forEach(([k, v]) => {
-    const key = g.name + '.' + k, j = JSON.stringify(v);
-    cur[key] = j;
-    vars.push({ name: k, ...v, auto: true, group: g.name === 'global' ? null : g.name + '()', changed: prev !== null && prev[key] !== j });
-  }));
-  return { vars, cur };
+  const vars = [], cur = {}, moved = [];
+  groups.forEach(g => {
+    const group = g.name === 'global' ? null : g.name + '()';
+    g.vars.forEach(([k, v]) => {
+      const key = g.name + '.' + k, j = JSON.stringify(v);
+      cur[key] = j;
+      vars.push({ name: k, ...v, auto: true, group, changed: prev !== null && prev[key] !== j });
+    });
+    attachLoops(g, group, vars, cur, prev, moved);
+  });
+  return { vars, cur, moved };
 }
 
 function traceSteps(res, src) {
   const lines = src.split('\n');
   let prev = {}, prevOut = '';
   const steps = res.steps.map(s => {
-    const { vars, cur } = toVars(s.groups, prev);
+    const { vars, cur, moved } = toVars(s.groups, prev);
     const changes = vars.filter(v => v.changed && v.kind !== 'fn').map(v => `<b>${esc(v.name)}</b> = ${esc(fmtVal(v))}`);
     const out = outText(s.segs);
     const printed = out.length > prevOut.length ? out.slice(prevOut.length).trimEnd() : '';
     let note = `Baris ${s.line}: <code>${esc((lines[s.line - 1] || '').trim())}</code>`;
+    moved.forEach(l => {
+      note += `<br>🔁 <b>${esc(l.target)}</b> = ${esc(l.val)} — elemen ke-${l.i} dari <code>${esc(l.src || l.label)}</code>`;
+    });
     if (changes.length) note += `<br>→ ${changes.join(', ')}`;
     if (printed) note += `<br>→ mencetak: <code>${esc(printed)}</code>`;
     prev = cur; prevOut = out;
